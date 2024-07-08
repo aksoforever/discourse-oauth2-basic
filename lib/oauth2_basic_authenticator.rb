@@ -193,6 +193,7 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
         user_emails = JSON.parse(user_emails_response.body)
         log("user_emails:\n#{user_emails.to_yaml}")
   
+        # Find primary and verified email
         primary_email = user_emails.find { |email| email["primary"] && email["verified"] }
         if primary_email
           result[:email] = primary_email["email"]
@@ -210,6 +211,7 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
       nil
     end
   end
+  
   
   
 
