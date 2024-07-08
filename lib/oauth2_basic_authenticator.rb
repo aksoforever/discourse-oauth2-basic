@@ -175,8 +175,6 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
         json_walk(result, user_json, :user_id)
         json_walk(result, user_json, :username)
         json_walk(result, user_json, :name)
-        json_walk(result, user_json, :email)
-        json_walk(result, user_json, :email_verified)
         json_walk(result, user_json, :avatar)
       end
   
@@ -212,6 +210,7 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
       nil
     end
   end
+  
   
 
   def primary_email_verified?(auth)
