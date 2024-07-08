@@ -171,39 +171,42 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
 
       log("user_json:\n#{user_json.to_yaml}")
 
-      # Fetch email separately
-      email_json_url = "https://api.github.com/user/emails"
-      email_json_response = connection.run_request(:get, email_json_url, nil, headers)
-
-      log <<-LOG
-        email_json request: GET #{email_json_url}
-
-        request headers: #{headers}
-
-        response status: #{email_json_response.status}
-
-        response body:
-        #{email_json_response.body}
-      LOG
-
-      if email_json_response.status == 200
-        email_json = JSON.parse(email_json_response.body)
-        primary_email = email_json.find { |e| e["primary"] }&.dig("email")
-      end
       result = {}
       if user_json.present?
         json_walk(result, user_json, :user_id)
         json_walk(result, user_json, :username)
         json_walk(result, user_json, :name)
-        result[:email] = primary_email if primary_email.present?
+        json_walk(result, user_json, :email)
         json_walk(result, user_json, :email_verified)
         json_walk(result, user_json, :avatar)
-
-        DiscoursePluginRegistry.oauth2_basic_additional_json_paths.each do |detail|
-          prop = "extra:#{detail}"
-          json_walk(result, user_json, prop, custom_path: detail)
-        end
       end
+      # Fetch user emails
+      user_emails_response = connection.run_request(user_json_method, user_emails_url, nil, headers)
+
+      log <<-LOG
+        user_emails request: #{user_json_method} #{user_emails_url}
+        request headers: #{headers}
+        response status: #{user_emails_response.status}
+        response body:
+        #{user_emails_response.body}
+      LOG
+
+      if user_emails_response.status == 200
+        user_emails = JSON.parse(user_emails_response.body)
+        log("user_emails:\n#{user_emails.to_yaml}")
+
+        primary_email = user_emails.find { |email| email["primary"] && email["verified"] }
+        if primary_email
+          result[:email] = primary_email["email"]
+        else
+          # Handle scenario where no primary email is found
+          result[:email] = nil
+        end
+      else
+        # Handle error fetching emails
+        result[:email] = nil
+      end
+
       result
     else
       nil
