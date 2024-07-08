@@ -147,30 +147,29 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
   end
 
   def fetch_user_details(token, id)
-    user_json_url = SiteSetting.oauth2_user_json_url.sub(":token", token.to_s).sub(":id", id.to_s)
-    user_json_method = SiteSetting.oauth2_user_json_url_method.downcase.to_sym
-
+    user_json_url = "https://api.github.com/user"
+    user_emails_url = "https://api.github.com/user/emails"
+    user_json_method = :get
+  
     bearer_token = "Bearer #{token}"
     connection = Faraday.new { |f| f.adapter FinalDestination::FaradayAdapter }
     headers = { "Authorization" => bearer_token, "Accept" => "application/json" }
+  
+    # Fetch user details
     user_json_response = connection.run_request(user_json_method, user_json_url, nil, headers)
-
+  
     log <<-LOG
       user_json request: #{user_json_method} #{user_json_url}
-
       request headers: #{headers}
-
       response status: #{user_json_response.status}
-
       response body:
       #{user_json_response.body}
     LOG
-
+  
     if user_json_response.status == 200
       user_json = JSON.parse(user_json_response.body)
-
       log("user_json:\n#{user_json.to_yaml}")
-
+  
       result = {}
       if user_json.present?
         json_walk(result, user_json, :user_id)
@@ -180,9 +179,10 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
         json_walk(result, user_json, :email_verified)
         json_walk(result, user_json, :avatar)
       end
+  
       # Fetch user emails
       user_emails_response = connection.run_request(user_json_method, user_emails_url, nil, headers)
-
+  
       log <<-LOG
         user_emails request: #{user_json_method} #{user_emails_url}
         request headers: #{headers}
@@ -190,11 +190,11 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
         response body:
         #{user_emails_response.body}
       LOG
-
+  
       if user_emails_response.status == 200
         user_emails = JSON.parse(user_emails_response.body)
         log("user_emails:\n#{user_emails.to_yaml}")
-
+  
         primary_email = user_emails.find { |email| email["primary"] && email["verified"] }
         if primary_email
           result[:email] = primary_email["email"]
@@ -206,12 +206,13 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
         # Handle error fetching emails
         result[:email] = nil
       end
-
+  
       result
     else
       nil
     end
   end
+  
 
   def primary_email_verified?(auth)
     return true if SiteSetting.oauth2_email_verified
