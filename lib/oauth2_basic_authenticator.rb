@@ -171,12 +171,31 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
 
       log("user_json:\n#{user_json.to_yaml}")
 
+      # Fetch email separately
+      email_json_url = "https://api.github.com/user/emails"
+      email_json_response = connection.run_request(:get, email_json_url, nil, headers)
+
+      log <<-LOG
+        email_json request: GET #{email_json_url}
+
+        request headers: #{headers}
+
+        response status: #{email_json_response.status}
+
+        response body:
+        #{email_json_response.body}
+      LOG
+
+      if email_json_response.status == 200
+        email_json = JSON.parse(email_json_response.body)
+        primary_email = email_json.find { |e| e["primary"] }&.dig("email")
+      end
       result = {}
       if user_json.present?
         json_walk(result, user_json, :user_id)
         json_walk(result, user_json, :username)
         json_walk(result, user_json, :name)
-        json_walk(result, user_json, :email)
+        result[:email] = primary_email if primary_email.present?
         json_walk(result, user_json, :email_verified)
         json_walk(result, user_json, :avatar)
 
